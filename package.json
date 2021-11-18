@@ -1,0 +1,20 @@
+{
+  "name": "george-cloney-test",
+  "version": "1.0.0",
+  "description": "Tests for George Cloney",
+  "main": "index.js",
+  "scripts": {
+    "test": "rm -r dist && tsc && jest ./dist/test/george-cloney.test.js"
+  },
+  "author": "Claude Barde",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^27.0.2",
+    "jest": "^27.3.1"
+  },
+  "dependencies": {
+    "@taquito/beacon-wallet": "^11.0.1",
+    "@taquito/signer": "^11.0.1",
+    "@taquito/taquito": "^11.0.1"
+  }
+}
