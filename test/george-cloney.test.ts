@@ -1,7 +1,13 @@
 import GeorgeCloney from "../cloney/GeorgeCloney";
 import config from "../cloney/config";
-import { NetworkType, TezosContractAddress } from "../cloney/types";
+import {
+  NetworkType,
+  TezosContractAddress,
+  StorageType
+} from "../cloney/types";
+import { MichelsonMap } from "@taquito/taquito";
 import { InMemorySigner } from "@taquito/signer";
+import BigNumber from "bignumber.js";
 
 describe("Set up", () => {
   let georgeCloney: GeorgeCloney | undefined;
@@ -10,7 +16,13 @@ describe("Set up", () => {
   } = {
     PLENTY: {
       address: "KT1GRSvLoikDsXujKgZPsGLX8k8VvR2Tq95b",
-      valuesInStorage: ["administrator", "lastUpdate", "paused", "totalSupply"]
+      valuesInStorage: [
+        "administrator",
+        "lastUpdate",
+        "paused",
+        "totalSupply",
+        "tokensPerBlock"
+      ]
     }
   };
   const signerSk =
@@ -91,8 +103,39 @@ describe("Set up", () => {
     expect(georgeCloney).toBeDefined();
 
     if (georgeCloney) {
+      // tests for the Plenty contract
+      const originalStorageValues: any = {};
+      contractAddress.PLENTY.valuesInStorage.forEach(
+        val =>
+          (originalStorageValues[val] = BigNumber.isBigNumber(
+            georgeCloney?.contractToOriginate?.storage[val]
+          )
+            ? georgeCloney?.contractToOriginate?.storage[val].toNumber()
+            : georgeCloney?.contractToOriginate?.storage[val])
+      );
       // Empty storage
+      georgeCloney = georgeCloney.addStorage(StorageType.EMPTY);
+      const newEmptyStorage = georgeCloney.getNewStorage();
+      expect(newEmptyStorage.type).toEqual(StorageType.EMPTY);
+      Object.values(newEmptyStorage.storage).forEach(val => {
+        if (val instanceof MichelsonMap) {
+          expect((val as any).size).toEqual(0);
+        } else {
+          expect(!!val).toBeFalsy();
+        }
+      });
       // Current storage
+      georgeCloney = georgeCloney.addStorage(StorageType.CURRENT);
+      const newCurrentStorage = georgeCloney.getNewStorage();
+      expect(newCurrentStorage.type).toEqual(StorageType.CURRENT);
+      Object.entries(newCurrentStorage.storage).forEach(([key, val]) => {
+        // ignoring map/bigmap values
+        if (BigNumber.isBigNumber(val)) {
+          expect(val.toNumber()).toEqual(originalStorageValues[key]);
+        } else if (!(val instanceof MichelsonMap)) {
+          expect(val).toEqual(originalStorageValues[key]);
+        }
+      });
     }
   });
 });

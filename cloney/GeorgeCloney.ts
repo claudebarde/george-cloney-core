@@ -1,7 +1,10 @@
 import {
   TezosToolkit,
   BigMapAbstraction,
-  MichelsonMap
+  MichelsonMap,
+  ContractAbstraction,
+  Wallet,
+  ContractProvider
 } from "@taquito/taquito";
 import { validateContractAddress } from "@taquito/utils";
 import type { MichelsonV1Expression } from "@taquito/rpc";
@@ -184,7 +187,10 @@ export default class GeorgeCloney {
   public copyBigMap(bigmapId: number) {}
 
   // originates a new contract
-  public async clone(): Promise<string> {
+  public async clone(): Promise<{
+    address: TezosContractAddress;
+    contract: ContractAbstraction<Wallet | ContractProvider>;
+  }> {
     if (!this.networkFrom) throw "No source network";
     if (!this.networkTo) throw "No target network";
     if (!this.contractToOriginate) throw "No contract to originate";
@@ -206,7 +212,7 @@ export default class GeorgeCloney {
     }
     const contract = await op.contract();
 
-    return contract.address;
+    return { address: contract.address as TezosContractAddress, contract };
   }
 
   // clears data related to previously fetched contract
