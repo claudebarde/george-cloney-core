@@ -5,14 +5,18 @@ import {
   TezosContractAddress,
   StorageType
 } from "../cloney/types";
-import { MichelsonMap } from "@taquito/taquito";
+import { MichelsonMap, BigMapAbstraction } from "@taquito/taquito";
 import { InMemorySigner } from "@taquito/signer";
 import BigNumber from "bignumber.js";
 
-describe("Set up", () => {
+describe("George Cloney Tests", () => {
   let georgeCloney: GeorgeCloney | undefined;
-  const contractAddress: {
-    [p in string]: { address: TezosContractAddress; valuesInStorage: string[] };
+  const contracts: {
+    [p in string]: {
+      address: TezosContractAddress;
+      valuesInStorage: string[];
+      customStorage: any;
+    };
   } = {
     PLENTY: {
       address: "KT1GRSvLoikDsXujKgZPsGLX8k8VvR2Tq95b",
@@ -22,13 +26,23 @@ describe("Set up", () => {
         "paused",
         "totalSupply",
         "tokensPerBlock"
-      ]
+      ],
+      customStorage: {
+        administrator: "tz1Me1MGhK7taay748h4gPnX2cXvbgL6xsYL",
+        balances: new MichelsonMap(),
+        lastUpdate: 12345,
+        metadata: new MichelsonMap(),
+        paused: false,
+        token_metadata: new MichelsonMap(),
+        tokensPerBlock: 20000000000000000000,
+        totalSupply: 1000
+      }
     }
   };
   const signerSk =
     "edskRpm2mUhvoUjHjXgMoDRxMKhtKfww1ixmWiHCWhHuMEEbGzdnz8Ks4vgarKDtxok7HmrEo1JzkXkdkvyw7Rtw6BNtSd7MJ7";
 
-  jest.setTimeout(30000);
+  jest.setTimeout(60000);
 
   test("Passes wrong values to set up George Cloney", () => {
     expect(
@@ -87,12 +101,12 @@ describe("Set up", () => {
 
       // SUCCESS
       expect(georgeCloney.contractToOriginate).toBeUndefined();
-      georgeCloney = await georgeCloney.fetch(contractAddress.PLENTY.address);
+      georgeCloney = await georgeCloney.fetch(contracts.PLENTY.address);
 
       expect(georgeCloney.contractToOriginate).toBeDefined();
       expect(georgeCloney.contractToOriginate).toHaveProperty("address");
       expect(georgeCloney.contractToOriginate?.address).toEqual(
-        contractAddress.PLENTY.address
+        contracts.PLENTY.address
       );
       expect(Array.isArray(georgeCloney.contractToOriginate?.code)).toBe(true);
       expect(georgeCloney.contractToOriginate?.code).toHaveLength(3);
@@ -105,7 +119,7 @@ describe("Set up", () => {
     if (georgeCloney) {
       // tests for the Plenty contract
       const originalStorageValues: any = {};
-      contractAddress.PLENTY.valuesInStorage.forEach(
+      contracts.PLENTY.valuesInStorage.forEach(
         val =>
           (originalStorageValues[val] = BigNumber.isBigNumber(
             georgeCloney?.contractToOriginate?.storage[val]
@@ -134,6 +148,65 @@ describe("Set up", () => {
           expect(val.toNumber()).toEqual(originalStorageValues[key]);
         } else if (!(val instanceof MichelsonMap)) {
           expect(val).toEqual(originalStorageValues[key]);
+        }
+      });
+      // Custom storage
+      georgeCloney = georgeCloney.addStorage(
+        StorageType.CUSTOM,
+        contracts.PLENTY.customStorage
+      );
+      const newCustomStorage = georgeCloney.getNewStorage();
+      Object.entries(originalStorageValues).forEach(([key, _]) => {
+        expect(newCustomStorage.storage).toHaveProperty(key);
+      });
+    }
+  });
+
+  test("Sets the target network for the new contract", () => {
+    expect(georgeCloney).toBeDefined();
+
+    if (georgeCloney) {
+      expect(georgeCloney.networkTo).toBeUndefined();
+      expect(georgeCloney.networkToUrl).toBeUndefined();
+
+      // sets network but not RPC URL
+      georgeCloney = georgeCloney.setTargetNetwork(NetworkType.GRANADANET);
+      expect(georgeCloney.networkTo).toEqual(NetworkType.GRANADANET);
+      expect(georgeCloney.networkToUrl).toEqual(
+        config.defaultRpcUrls[NetworkType.GRANADANET]
+      );
+
+      // sets network and RPC URL
+      const rpcUrl = "http://localhost:20000"; // local flextesa instance
+      georgeCloney = georgeCloney.setTargetNetwork(
+        NetworkType.HANGZHOUNET,
+        rpcUrl
+      );
+      expect(georgeCloney.networkTo).toEqual(NetworkType.HANGZHOUNET);
+      expect(georgeCloney.networkToUrl).toEqual(rpcUrl);
+    }
+  });
+
+  test("Originates the cloned contract", async () => {
+    expect(georgeCloney).toBeDefined();
+
+    if (georgeCloney) {
+      const { address, contract } = await georgeCloney.clone();
+      console.log("Contract address:", address);
+      expect(address).toBeDefined();
+      expect(contract).toBeDefined();
+      // checks if the storage of the new contract matches the one in George Cloney
+      const cloneyStorage: any = georgeCloney.getNewStorage();
+      const originatedStorage: any = await contract.storage();
+      Object.entries(originatedStorage).forEach(([key, val]) => {
+        // ignoring map/bigmap values
+        if (BigNumber.isBigNumber(val)) {
+          expect(val.toNumber()).toEqual(cloneyStorage.storage[key]);
+        } else if (
+          !(val instanceof MichelsonMap) &&
+          !(val instanceof BigMapAbstraction)
+        ) {
+          expect(val).toEqual(cloneyStorage.storage[key]);
         }
       });
     }

@@ -179,6 +179,12 @@ export default class GeorgeCloney {
     }
 
     this.TezosTo = new TezosToolkit(this.networkToUrl);
+    // sets signer
+    if (this.signer instanceof InMemorySigner) {
+      this.TezosTo.setSignerProvider(this.signer);
+    } else if (this.signer instanceof BeaconWallet) {
+      this.TezosTo.setWalletProvider(this.signer);
+    }
 
     return this;
   }
