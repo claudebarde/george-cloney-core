@@ -1,4 +1,6 @@
 export type TezosContractAddress = `KT1${string}`;
+export type BigmapName = string;
+export type BigmapId = number;
 
 export enum NetworkType {
   "MAINNET" = "MAINNET",
@@ -10,6 +12,7 @@ export enum NetworkType {
 
 export interface Config {
   defaultRpcUrls: { [p in NetworkType]: string };
+  indexerUrl: string;
 }
 
 export enum StorageType {

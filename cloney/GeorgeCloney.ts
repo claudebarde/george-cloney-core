@@ -11,7 +11,14 @@ import type { MichelsonV1Expression } from "@taquito/rpc";
 import { InMemorySigner } from "@taquito/signer";
 import { BeaconWallet } from "@taquito/beacon-wallet";
 import BigNumber from "bignumber.js";
-import { NetworkType, TezosContractAddress, StorageType } from "./types";
+import axios from "axios";
+import {
+  NetworkType,
+  TezosContractAddress,
+  StorageType,
+  BigmapName,
+  BigmapId
+} from "./types";
 import config from "./config";
 
 export default class GeorgeCloney {
@@ -32,6 +39,10 @@ export default class GeorgeCloney {
   private TezosFrom: TezosToolkit;
   private TezosTo: TezosToolkit | undefined;
   private taquitoApi: "wallet" | "contract";
+  private bigmapIds: [BigmapName, BigmapId][] | undefined;
+  private bigmapsToClone:
+    | { id: BigmapId; entries: { key: string; value: any }[] }[]
+    | undefined;
 
   constructor(params: {
     from: NetworkType;
@@ -95,6 +106,12 @@ export default class GeorgeCloney {
         storage
       };
       this.contractToOriginate = newContract;
+
+      // finds bigmap ids in the contract
+      const bigmapIds: [BigmapName, BigmapId][] = Object.entries(storage)
+        .filter(([_, val]) => val instanceof BigMapAbstraction)
+        .map(([name, val]) => [name, +(val as BigMapAbstraction).toString()]);
+      if (bigmapIds.length > 0) this.bigmapIds = bigmapIds;
 
       return this;
     } catch (error) {
@@ -190,7 +207,37 @@ export default class GeorgeCloney {
   }
 
   // copies data from bigmap in source contract
-  public copyBigMap(bigmapId: number) {}
+  public async copyBigMap(bigmapIds: Array<BigmapId>): Promise<boolean> {
+    try {
+      const bigmapIdsPromises = await Promise.all(
+        bigmapIds.map(async id => {
+          return {
+            id,
+            entries: await axios
+              .get(config.indexerUrl + `bigmaps/${id}/keys?limit=10`)
+              .then(val => val.data)
+          };
+        })
+      );
+      const bigmapEntries = bigmapIdsPromises.map(val => {
+        return {
+          id: val.id,
+          entries: val.entries
+            .filter((val: any) => val.active === true)
+            .map((entry: any) => ({ key: entry.key, value: entry.value }))
+        };
+      });
+      if (bigmapEntries.length > 0) {
+        this.bigmapsToClone = [...bigmapEntries];
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error);
+
+      return false;
+    }
+  }
 
   // originates a new contract
   public async clone(): Promise<{
@@ -201,6 +248,22 @@ export default class GeorgeCloney {
     if (!this.networkTo) throw "No target network";
     if (!this.contractToOriginate) throw "No contract to originate";
     if (!this.TezosTo) throw "Tezos Toolkit missing for target network";
+
+    // updates storage to originate with selected bigmap entries
+    if (this.bigmapIds && this.bigmapsToClone) {
+      this.bigmapsToClone.forEach(bigmap => {
+        const bmap = this.bigmapIds?.find(b => b[1] === bigmap.id);
+        if (bmap) {
+          const bigmapName = bmap[0];
+          const newBigmap = new MichelsonMap();
+          console.log(this.newStorage[bigmapName].valueMap);
+          bigmap.entries.forEach(entry =>
+            newBigmap.set(entry.key, entry.value)
+          );
+          this.newStorage[bigmapName] = newBigmap;
+        }
+      });
+    }
 
     let op;
     if (this.taquitoApi === "wallet") {
@@ -227,5 +290,14 @@ export default class GeorgeCloney {
   // returns the currently saved storage for the new contract
   public getNewStorage() {
     return { storage: this.newStorage, type: this.newStorageType };
+  }
+
+  // returns the ids of all the bigmaps in the storage
+  public getBigmapsIds() {
+    if (!this.bigmapIds) {
+      return [];
+    } else {
+      return this.bigmapIds;
+    }
   }
 }

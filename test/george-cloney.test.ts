@@ -110,6 +110,9 @@ describe("George Cloney Tests", () => {
       );
       expect(Array.isArray(georgeCloney.contractToOriginate?.code)).toBe(true);
       expect(georgeCloney.contractToOriginate?.code).toHaveLength(3);
+
+      const bigmapIds = georgeCloney.getBigmapsIds();
+      await georgeCloney.copyBigMap([bigmapIds[0][1]]);
     }
   });
 
@@ -198,6 +201,7 @@ describe("George Cloney Tests", () => {
       // checks if the storage of the new contract matches the one in George Cloney
       const cloneyStorage: any = georgeCloney.getNewStorage();
       const originatedStorage: any = await contract.storage();
+      console.log(JSON.stringify(originatedStorage, null, 2));
       Object.entries(originatedStorage).forEach(([key, val]) => {
         // ignoring map/bigmap values
         if (BigNumber.isBigNumber(val)) {

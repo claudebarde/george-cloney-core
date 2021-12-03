@@ -1,4 +1,4 @@
-import type { NetworkType, Config } from "./types";
+import type { Config } from "./types";
 
 const config: Config = {
   defaultRpcUrls: {
@@ -7,7 +7,8 @@ const config: Config = {
     GRANADANET: "https://granadanet.api.tez.ie",
     FLORENCENET: "https://florencenet.api.tez.ie",
     CUSTOM: ""
-  }
+  },
+  indexerUrl: "https://api.tzkt.io/v1/"
 };
 
 export default config;
