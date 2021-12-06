@@ -21,6 +21,19 @@ import {
 } from "./types";
 import config from "./config";
 
+const findMapsInBigmap = (type: any): string[] => {
+  if (type.prim === "pair") {
+    return [
+      ...findMapsInBigmap(type.args[0]),
+      ...findMapsInBigmap(type.args[1])
+    ].flat();
+  } else if (type.prim === "map") {
+    return [type.annots[0].replace("%", "")];
+  } else {
+    return [];
+  }
+};
+
 export default class GeorgeCloney {
   public networkFrom: NetworkType;
   public networkFromUrl: string;
@@ -213,20 +226,51 @@ export default class GeorgeCloney {
         bigmapIds.map(async id => {
           return {
             id,
+            type: await axios
+              .get(config.indexerUrl + `bigmaps/${id}/type`)
+              .then(val => val.data),
             entries: await axios
-              .get(config.indexerUrl + `bigmaps/${id}/keys?limit=10`)
+              .get(
+                config.indexerUrl + `bigmaps/${id}/keys?limit=10&active=true`
+              )
               .then(val => val.data)
           };
         })
       );
-      const bigmapEntries = bigmapIdsPromises.map(val => {
+      let bigmapEntries = bigmapIdsPromises.map(val => {
         return {
           id: val.id,
+          type: val.type,
           entries: val.entries
             .filter((val: any) => val.active === true)
             .map((entry: any) => ({ key: entry.key, value: entry.value }))
         };
       });
+      // find maps in bigmap
+      const maps = findMapsInBigmap(bigmapEntries[0].type.args[1]);
+      // if map, formats entries for Taquito
+      //console.log(JSON.stringify(bigmapEntries[0].entries, null, 2));
+      maps.forEach(map => {
+        bigmapEntries = bigmapEntries.map(bigmap => {
+          return {
+            ...bigmap,
+            entries: bigmap.entries.map((entry: any) => {
+              if (entry.value.hasOwnProperty(map)) {
+                return {
+                  ...entry,
+                  value: {
+                    ...entry.value,
+                    [map]: MichelsonMap.fromLiteral(entry.value[map])
+                  }
+                };
+              } else {
+                return entry;
+              }
+            })
+          };
+        });
+      });
+
       if (bigmapEntries.length > 0) {
         this.bigmapsToClone = [...bigmapEntries];
       }
@@ -256,7 +300,6 @@ export default class GeorgeCloney {
         if (bmap) {
           const bigmapName = bmap[0];
           const newBigmap = new MichelsonMap();
-          console.log(this.newStorage[bigmapName].valueMap);
           bigmap.entries.forEach(entry =>
             newBigmap.set(entry.key, entry.value)
           );

@@ -19,7 +19,7 @@ describe("George Cloney Tests", () => {
     };
   } = {
     PLENTY: {
-      address: "KT1GRSvLoikDsXujKgZPsGLX8k8VvR2Tq95b",
+      address: "KT1CA7QaXeciRJttSiWtPXdfYBsVFZBMK8Rj", //"KT1GRSvLoikDsXujKgZPsGLX8k8VvR2Tq95b",
       valuesInStorage: [
         "administrator",
         "lastUpdate",
@@ -65,7 +65,7 @@ describe("George Cloney Tests", () => {
   });
 
   test("Checks if George Cloney is set correctly", () => {
-    const networkFrom = NetworkType.MAINNET;
+    const networkFrom = NetworkType.HANGZHOUNET;
 
     georgeCloney = new GeorgeCloney({
       from: networkFrom,
@@ -110,9 +110,6 @@ describe("George Cloney Tests", () => {
       );
       expect(Array.isArray(georgeCloney.contractToOriginate?.code)).toBe(true);
       expect(georgeCloney.contractToOriginate?.code).toHaveLength(3);
-
-      const bigmapIds = georgeCloney.getBigmapsIds();
-      await georgeCloney.copyBigMap([bigmapIds[0][1]]);
     }
   });
 
@@ -165,6 +162,15 @@ describe("George Cloney Tests", () => {
     }
   });
 
+  test("Copies contract bigmaps", async () => {
+    expect(georgeCloney).toBeDefined();
+
+    if (georgeCloney) {
+      const bigmapIds = georgeCloney.getBigmapsIds();
+      await georgeCloney.copyBigMap([bigmapIds[0][1]]);
+    }
+  });
+
   test("Sets the target network for the new contract", () => {
     expect(georgeCloney).toBeDefined();
 
@@ -193,7 +199,7 @@ describe("George Cloney Tests", () => {
   test("Originates the cloned contract", async () => {
     expect(georgeCloney).toBeDefined();
 
-    if (georgeCloney) {
+    if (georgeCloney && georgeCloney.contractToOriginate) {
       const { address, contract } = await georgeCloney.clone();
       console.log("Contract address:", address);
       expect(address).toBeDefined();
@@ -201,7 +207,6 @@ describe("George Cloney Tests", () => {
       // checks if the storage of the new contract matches the one in George Cloney
       const cloneyStorage: any = georgeCloney.getNewStorage();
       const originatedStorage: any = await contract.storage();
-      console.log(JSON.stringify(originatedStorage, null, 2));
       Object.entries(originatedStorage).forEach(([key, val]) => {
         // ignoring map/bigmap values
         if (BigNumber.isBigNumber(val)) {
@@ -212,6 +217,49 @@ describe("George Cloney Tests", () => {
         ) {
           expect(val).toEqual(cloneyStorage.storage[key]);
         }
+      });
+      // checks if balance bigmap was copied properly
+      const originalBalance =
+        await georgeCloney.contractToOriginate.storage.balances.get(
+          "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb"
+        );
+      const newStorage: any = await contract.storage();
+      const newBalance = await newStorage.balances.get(
+        "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb"
+      );
+      //console.log(originalBalance);
+      expect(originalBalance).toBeDefined();
+      // checks same balance
+      expect(newBalance).toBeDefined();
+      expect(originalBalance.balance.toNumber()).toEqual(
+        newBalance.balance.toNumber()
+      );
+      // checks entries in approval maps
+      const originalApprovals: { address: string; amount: number }[] = [];
+      const newApprovals: { address: string; amount: number }[] = [];
+      const originalEntries = originalBalance.approvals.entries();
+      for (let entry of originalEntries) {
+        originalApprovals.push({
+          address: entry[0],
+          amount: entry[1].toNumber()
+        });
+      }
+      const newEntries = newBalance.approvals.entries();
+      for (let entry of newEntries) {
+        newApprovals.push({
+          address: entry[0],
+          amount: entry[1].toNumber()
+        });
+      }
+      //console.log(originalApprovals, newApprovals);
+      originalApprovals.forEach(approval => {
+        expect(
+          newApprovals.filter(
+            appr =>
+              appr.address === approval.address &&
+              appr.amount === approval.amount
+          )
+        ).toBeTruthy();
       });
     }
   });

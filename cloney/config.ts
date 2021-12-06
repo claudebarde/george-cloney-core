@@ -8,7 +8,7 @@ const config: Config = {
     FLORENCENET: "https://florencenet.api.tez.ie",
     CUSTOM: ""
   },
-  indexerUrl: "https://api.tzkt.io/v1/"
+  indexerUrl: "https://api.hangzhou2net.tzkt.io/v1/"
 };
 
 export default config;
